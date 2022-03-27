@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -32,7 +33,18 @@ func main() {
 		panic(err)
 	}
 	defer gw.Close()
-	discordMain(gw)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		discordMain(gw)
+		wg.Done()
+	}()
+	go func() {
+		mcMain(context.Background(), gw)
+		wg.Done()
+	}()
+
+	wg.Wait()
 }
 
 func discordMain(gw *gateway) {
@@ -118,6 +130,34 @@ func discordMain(gw *gateway) {
 			fmt.Printf("Recieve Dispatch: CHANNEL_CREATE: %+v\n", d)
 		default:
 			fmt.Printf("Recieve: Unsupported payload: %+v\nD: %+v\n", payload, payload.D)
+		}
+	}
+}
+
+const mcLogFile = "/tmp/latest.log"
+
+func mcMain(ctx context.Context, gw *gateway) {
+	mcChannelID := snowflake(os.Getenv("DISCRAFT_CHANNEL"))
+	if len(mcChannelID) == 0 {
+		panic("DISCRAFT_CHANNEL not set")
+	}
+
+	lines, err := parseMCLog(ctx, mcLogFile)
+	if err != nil {
+		panic(err)
+	}
+
+	for log := range lines {
+		switch l := log.(type) {
+		case logJoin:
+			// createMessage(mcChannelID, fmt.Sprintf("%s joined", l.user))
+			fmt.Printf("l = %#v\n", l)
+		case logPart:
+			fmt.Printf("l = %#v\n", l)
+		case logMsg:
+			fmt.Printf("l = %#v\n", l)
+		default:
+			fmt.Printf("Unsupported mc log of type %T: %+v", l, l)
 		}
 	}
 }
