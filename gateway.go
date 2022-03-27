@@ -31,12 +31,16 @@ func (gw *gateway) ReadMessage() ([]byte, error) {
 	return message, err
 }
 
-func (gw *gateway) writeJSONMessage(msg any) error {
+func (gw *gateway) writeJSONMessage(msg wsPayload) error {
 	data, err := json.Marshal(msg)
 	if err != nil {
 		return fmt.Errorf("marshaling message: %w", err)
 	}
-	fmt.Printf("Send: %s\n", data)
+	if msg.OP == 2 { // Identify, don't print token
+		fmt.Printf("Send: opIdentify (censored)\n")
+	} else {
+		fmt.Printf("Send: %s\n", data)
+	}
 	if err := gw.wsc.WriteMessage(websocket.TextMessage, data); err != nil {
 		return fmt.Errorf("writing message: %w", err)
 	}
