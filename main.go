@@ -15,10 +15,10 @@ const discordBaseURL = "https://discord.com/api"
 
 type wsPayload struct {
 	// https://ptb.discord.com/developers/docs/topics/opcodes-and-status-codes#gateway-gateway-opcodes
-	OP  int    `json:"op"` // opcode for the payload
-	D   any    `json:"d"`  // event data
-	Seq *int   `json:"s"`  // sequence number, used for resuming sessions and heartbeats
-	T   string `json:"t"`  // the event name for this payload
+	OP  int    `json:"op"`          // opcode for the payload
+	D   any    `json:"d"`           // event data
+	Seq *int   `json:"s,omitempty"` // sequence number, used for resuming sessions and heartbeats
+	T   string `json:"t,omitempty"` // the event name for this payload
 }
 
 type helloPayload struct {
@@ -58,9 +58,9 @@ type opReady struct {
 	V int `json:"v"` //	gateway version
 	// User	user `json:"user"` //	object	information about the user including email
 	// Guilds	array of Unavailable Guild objects	`json:"guilds"`// the guilds the user is in
-	// Session_id  string         `json:"session_id"`       //	used for resuming connections
-	// Shard       []int          `json:"shard",omitempty"` // array of two integers (shard_id, num_shards)	the shard information associated with this session, if sent when identifying
-	Application applicationObj `json:"application"` //	contains id and flags
+	Session_id  string         `json:"session_id"`       //	used for resuming connections
+	Shard       []int          `json:"shard",omitempty"` // array of two integers (shard_id, num_shards)	the shard information associated with this session, if sent when identifying
+	Application applicationObj `json:"application"`      //	contains id and flags
 }
 
 type applicationObj struct {
@@ -106,7 +106,7 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Printf("gatewayURL = %+v\n", gatewayURL)
+	fmt.Printf("Connecting to Gateway URL = %+v\n", gatewayURL)
 
 	wsc, _, err := websocket.DefaultDialer.Dial(gatewayURL, nil) // TODO: Specify API version
 	if err != nil {
@@ -115,6 +115,18 @@ func main() {
 	defer wsc.Close()
 
 	var heartbeatOnce sync.Once // TODO rename to initialStartup?
+
+	writeJSONMessage := func(msg any) error {
+		data, err := json.Marshal(msg)
+		if err != nil {
+			return fmt.Errorf("marshaling message: %w", err)
+		}
+		fmt.Printf("Send: %s\n", data)
+		if err := wsc.WriteMessage(websocket.TextMessage, data); err != nil {
+			return fmt.Errorf("writing message: %w", err)
+		}
+		return nil
+	}
 
 	for {
 		_, message, err := wsc.ReadMessage()
@@ -130,19 +142,18 @@ func main() {
 		case *helloPayload:
 			heartbeatInterval := d.HeartbeatInterval
 			heartbeatOnce.Do(func() {
-				fmt.Printf("Got Hello Payload with HeartbeatInterval %v\n", heartbeatInterval)
+				fmt.Printf("Recieve: Hello Payload with HeartbeatInterval %v\n", heartbeatInterval)
 				go func() {
 					for {
 						time.Sleep(heartbeatInterval)
-						fmt.Println("Sending heartbeat")
-						err := wsc.WriteMessage(websocket.TextMessage, []byte(`{ "op": 1, "d": {} }`))
-						if err != nil {
+						if err := writeJSONMessage(wsPayload{
+							OP: 1,
+						}); err != nil {
 							panic(err)
 						}
-						return
 					}
 				}()
-				jsond, err := json.Marshal(wsPayload{
+				if err := writeJSONMessage(wsPayload{
 					OP: 2,
 					D: opIdentify{
 						Token: os.Getenv("DISCRAFT_TOKEN"),
@@ -152,22 +163,16 @@ func main() {
 							Device:  "discraft",
 						},
 					},
-				})
-				if err != nil {
-					panic(err)
-				}
-
-				fmt.Printf("jsond = %+v\n", string(jsond))
-				if err := wsc.WriteMessage(websocket.TextMessage, jsond); err != nil {
+				}); err != nil {
 					panic(err)
 				}
 			})
 		case *heartbeatACK:
-			fmt.Println("Heartbeat ACK")
+			fmt.Println("Recieve: Heartbeat ACK")
 		case *opReady:
-			fmt.Printf("Ready: %+v\n", d)
+			fmt.Printf("Recieve: Ready: %+v\n", d)
 		default:
-			fmt.Printf("Unsupported payload: %+v\nD: %+v\n", payload, payload.D)
+			fmt.Printf("Recieve: Unsupported payload: %+v\nD: %+v\n", payload, payload.D)
 		}
 	}
 }
@@ -185,7 +190,6 @@ func getGatewayURL() (string, error) {
 	}
 
 	req.Header.Add("Authorization", "Bot "+os.Getenv("DISCRAFT_TOKEN"))
-	fmt.Printf("req.Header = %+v\n", req.Header)
 
 	res, err := client.Do(req)
 	if err != nil {
@@ -193,7 +197,7 @@ func getGatewayURL() (string, error) {
 	}
 	defer res.Body.Close()
 
-	fmt.Printf("res.Status = %+v\n", res.Status)
+	// TODO check res.Status
 
 	dec := json.NewDecoder(res.Body)
 	gResp := &gatewayResp{}
@@ -201,6 +205,5 @@ func getGatewayURL() (string, error) {
 		return "", fmt.Errorf("decoding response: %w", err)
 	}
 
-	fmt.Printf("gResp = %+v\n", gResp)
 	return gResp.URL, nil
 }
