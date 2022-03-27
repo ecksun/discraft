@@ -7,21 +7,85 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
+	"sync"
+	"time"
 )
 
 type restClient struct {
-	client *http.Client
+	sync.Mutex // protect the limits
+	client     *http.Client
+	limits     map[string]rateLimit
+}
+
+type rateLimit struct {
+	resets    time.Time
+	remaining int
+}
+
+func (l *rateLimit) Wait() {
+	if l == nil {
+		return
+	}
+	if l.remaining == 0 {
+		waitFor := l.resets.Sub(time.Now())
+		fmt.Printf("Hit rate limit, waiting for %v", waitFor)
+		time.Sleep(waitFor)
+	}
 }
 
 func newRESTClient() *restClient {
 	return &restClient{
 		client: &http.Client{},
+		limits: map[string]rateLimit{},
 	}
 }
 
 func (rc *restClient) doReq(req *http.Request) (*http.Response, error) {
 	req.Header.Add("Authorization", "Bot "+os.Getenv("DISCRAFT_TOKEN"))
-	return rc.client.Do(req)
+	rc.getLimit(req).Wait()
+	res, err := rc.client.Do(req)
+	rc.updateLimits(res)
+	return res, err
+}
+
+func getBucket(req *http.Request) string {
+	// bucket := res.Header.Get("X-RateLimit-Bucket") // This bucket is not very useful when we can't calculate it ourselves. Lets just use a good guess on what it depends on
+	return req.Method + " " + req.URL.String()
+}
+
+func (rc *restClient) getLimit(req *http.Request) *rateLimit {
+	rc.Lock()
+	defer rc.Unlock()
+	if limit, ok := rc.limits[getBucket(req)]; ok {
+		return &limit
+	}
+	return nil
+}
+
+func (rc *restClient) updateLimits(res *http.Response) {
+	if res == nil {
+		return
+	}
+	remaining, err := strconv.Atoi(res.Header.Get("X-RateLimit-Remaining"))
+	if err != nil {
+		fmt.Printf("Failed to parse X-RateLimit-Remaining header: %#v", err)
+		return
+	}
+	resetEpoch, err := strconv.ParseInt(res.Header.Get("X-RateLimit-Reset"), 10, 64)
+	if err != nil {
+		fmt.Printf("Failed to parse X-RateLimit-Reset header: %#v", err)
+		return
+	}
+	resetTime := time.Unix(resetEpoch, 0)
+
+	rc.Lock()
+	defer rc.Unlock()
+
+	rc.limits[getBucket(res.Request)] = rateLimit{
+		resets:    resetTime,
+		remaining: remaining,
+	}
 }
 
 // https://ptb.discord.com/developers/docs/topics/gateway#get-gateway-bot
