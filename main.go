@@ -24,11 +24,11 @@ type wsPayload struct {
 	T   string `json:"t,omitempty"` // the event name for this payload
 }
 
-type helloPayload struct {
+type opHello struct {
 	HeartbeatInterval time.Duration `json:"heartbeat_interval"`
 }
 
-func (p *helloPayload) UnmarshalJSON(data []byte) error {
+func (p *opHello) UnmarshalJSON(data []byte) error {
 	var d map[string]interface{}
 	if err := json.Unmarshal(data, &d); err != nil {
 		return err
@@ -37,9 +37,9 @@ func (p *helloPayload) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type heartbeatACK struct{}
+type opHeartbeatACK struct{}
 
-type heartbeatPayload struct{}
+type opHeartbeat struct{}
 
 const (
 	INTENT_GUILD_MESSAGES  = 1 << 9
@@ -62,7 +62,7 @@ type identifyProperties struct {
 	Device  string `json:$device"`
 }
 
-type opReady struct {
+type dispatchReady struct {
 	V int `json:"v"` //	gateway version
 	// User	user `json:"user"` //	object	information about the user including email
 	// Guilds	array of Unavailable Guild objects	`json:"guilds"`// the guilds the user is in
@@ -152,7 +152,7 @@ func (wsp *wsPayload) UnmarshalJSON(data []byte) error {
 	case 0: // Dispatch
 		switch wsp.T {
 		case "READY":
-			wsp.D = &opReady{}
+			wsp.D = &dispatchReady{}
 		case "MESSAGE_CREATE":
 			wsp.D = &dispatchMessageCreate{}
 		case "CHANNEL_CREATE":
@@ -161,11 +161,11 @@ func (wsp *wsPayload) UnmarshalJSON(data []byte) error {
 			return fmt.Errorf("parsing unknown Dispatch type %q", wsp.T)
 		}
 	case 1: // Hearbeat
-		wsp.D = &heartbeatPayload{}
+		wsp.D = &opHeartbeat{}
 	case 10: // Hello
-		wsp.D = &helloPayload{}
+		wsp.D = &opHello{}
 	case 11: // Heartbeat ACK
-		wsp.D = &heartbeatACK{}
+		wsp.D = &opHeartbeatACK{}
 	}
 	if wsp.D != nil {
 		if err := json.Unmarshal(v.D, wsp.D); err != nil {
@@ -225,7 +225,7 @@ func main() {
 		}
 
 		switch d := payload.D.(type) {
-		case *helloPayload:
+		case *opHello:
 			heartbeatInterval := d.HeartbeatInterval
 			heartbeatOnce.Do(func() {
 				fmt.Printf("Recieve: Hello Payload with HeartbeatInterval %v\n", heartbeatInterval)
@@ -254,9 +254,9 @@ func main() {
 					panic(err)
 				}
 			})
-		case *heartbeatACK:
+		case *opHeartbeatACK:
 			fmt.Println("Recieve: Heartbeat ACK")
-		case *opReady:
+		case *dispatchReady:
 			myID = d.Application.ID
 			fmt.Printf("Recieve: Ready: %+v\n", d)
 			fmt.Printf("myID = %+v\n", myID)
