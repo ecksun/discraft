@@ -52,3 +52,15 @@ $(DEB_PACKAGE_DIR)/usr/bin/$(NAME): $(OUT_DIR)/discraft
 $(DEB_PACKAGE_DIR)/lib/systemd/system/$(NAME).service: $(NAME).service
 	mkdir -p "$(dir $@)"
 	cp --link --force "$<" "$@"
+
+.PHONY: pre-release release
+pre-release: hub_extra_flags=--prerelease
+pre-release: release
+
+release: $(DEB_PACKAGE_DIR).deb
+	hub release create \
+		--attach="$(DEB_PACKAGE_DIR).deb" \
+		--message="$(VERSION)" \
+		$(hub_extra_flags) \
+		"$(VERSION)"
+
