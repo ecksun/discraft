@@ -35,8 +35,6 @@ func main() {
 	}
 	defer wsc.Close()
 
-	var heartbeatOnce sync.Once // TODO rename to initialStartup?
-
 	writeJSONMessage := func(msg any) error {
 		data, err := json.Marshal(msg)
 		if err != nil {
@@ -49,6 +47,7 @@ func main() {
 		return nil
 	}
 
+	var initialStartup sync.Once
 	var myID snowflake
 
 	for {
@@ -65,8 +64,8 @@ func main() {
 		switch d := payload.D.(type) {
 		case *opHello:
 			heartbeatInterval := d.HeartbeatInterval
-			heartbeatOnce.Do(func() {
-				fmt.Printf("Recieve: Hello Payload with HeartbeatInterval %v\n", heartbeatInterval)
+			fmt.Printf("Recieve: Hello Payload with HeartbeatInterval %v\n", heartbeatInterval)
+			initialStartup.Do(func() {
 				go func() {
 					for {
 						time.Sleep(heartbeatInterval)
