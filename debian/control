@@ -1,0 +1,5 @@
+Package: discraft
+Architecture: amd64
+Maintainer: linus <linus@noomi.com>
+Depends:
+Description: A discord-minecraft bridge
