@@ -16,6 +16,9 @@ set -e
 
 case "$1" in
     configure)
+        systemctl daemon-reload
+        systemctl enable discraft.service
+        systemctl restart discraft.service
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)

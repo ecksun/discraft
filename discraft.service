@@ -1,0 +1,11 @@
+[Unit]
+Description=A discord <-> minecraft bridge
+After=network.target
+
+[Service]
+EnvironmentFile=/etc/default/discraft
+ExecStart=/usr/bin/discraft
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
