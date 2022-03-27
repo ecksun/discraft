@@ -21,6 +21,7 @@ func main() {
 	reqEnvs := []string{
 		"DISCRAFT_TOKEN",
 		"DISCRAFT_CHANNEL",
+		"DISCRAFT_MCLOGFILE",
 	}
 	for _, env := range reqEnvs {
 		if os.Getenv(env) == "" {
@@ -150,15 +151,13 @@ func discordMain(gw *gateway, restClient *restClient) {
 	}
 }
 
-const mcLogFile = "/tmp/latest.log"
-
 func mcMain(ctx context.Context, gw *gateway, restClient *restClient) {
 	mcChannelID := snowflake(os.Getenv("DISCRAFT_CHANNEL"))
 	if len(mcChannelID) == 0 {
 		panic("DISCRAFT_CHANNEL not set")
 	}
 
-	lines, err := parseMCLog(ctx, mcLogFile)
+	lines, err := parseMCLog(ctx, os.Getenv("DISCRAFT_MCLOGFILE"))
 	if err != nil {
 		panic(err)
 	}
