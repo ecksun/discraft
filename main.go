@@ -32,7 +32,10 @@ func main() {
 		panic(err)
 	}
 	defer gw.Close()
+	discordMain(gw)
+}
 
+func discordMain(gw *gateway) {
 	var initialStartup sync.Once
 	var myID snowflake
 
