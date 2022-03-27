@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"regexp"
 
 	"github.com/nxadm/tail"
@@ -29,8 +30,13 @@ func parseMCLog(ctx context.Context, file string) (chan any, error) {
 	partRegex := regexp.MustCompile(fmt.Sprintf(`\[%s\] \[Server thread\/INFO\]: (.*) left the game`, timeRegex))
 	msgRegex := regexp.MustCompile(fmt.Sprintf(`\[%s\] \[Server thread\/INFO\]: <([^>]+)> (.*)`, timeRegex))
 
-	t, err := tail.TailFile(
-		file, tail.Config{Follow: true, ReOpen: true})
+	t, err := tail.TailFile(file, tail.Config{
+		Follow: true,
+		ReOpen: true,
+		Location: &tail.SeekInfo{
+			Whence: io.SeekEnd,
+		},
+	})
 	if err != nil {
 		return out, fmt.Errorf("tailing log file: %+v", err)
 	}
