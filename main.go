@@ -40,7 +40,7 @@ func main() {
 		wg.Done()
 	}()
 	go func() {
-		mcMain(context.Background(), gw)
+		mcMain(context.Background(), gw, restClient)
 		wg.Done()
 	}()
 
@@ -136,7 +136,7 @@ func discordMain(gw *gateway, restClient *restClient) {
 
 const mcLogFile = "/tmp/latest.log"
 
-func mcMain(ctx context.Context, gw *gateway) {
+func mcMain(ctx context.Context, gw *gateway, restClient *restClient) {
 	mcChannelID := snowflake(os.Getenv("DISCRAFT_CHANNEL"))
 	if len(mcChannelID) == 0 {
 		panic("DISCRAFT_CHANNEL not set")
@@ -150,12 +150,17 @@ func mcMain(ctx context.Context, gw *gateway) {
 	for log := range lines {
 		switch l := log.(type) {
 		case logJoin:
-			// createMessage(mcChannelID, fmt.Sprintf("%s joined", l.user))
-			fmt.Printf("l = %#v\n", l)
+			if _, err := restClient.createMessage(mcChannelID, fmt.Sprintf("%s joined", l.user)); err != nil {
+				fmt.Printf("failed to create message for %#v: %+v", l, err)
+			}
 		case logPart:
-			fmt.Printf("l = %#v\n", l)
+			if _, err := restClient.createMessage(mcChannelID, fmt.Sprintf("%s left", l.user)); err != nil {
+				fmt.Printf("failed to create message for %#v: %+v", l, err)
+			}
 		case logMsg:
-			fmt.Printf("l = %#v\n", l)
+			if _, err := restClient.createMessage(mcChannelID, fmt.Sprintf("<%s> %s", l.user, l.msg)); err != nil {
+				fmt.Printf("failed to create message for %#v: %+v", l, err)
+			}
 		default:
 			fmt.Printf("Unsupported mc log of type %T: %+v", l, l)
 		}
