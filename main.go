@@ -1,12 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -21,7 +18,9 @@ const (
 )
 
 func main() {
-	gatewayURL, err := getGatewayURL()
+	restClient := newRESTClient()
+
+	gatewayURL, err := restClient.getGatewayURL()
 	if err != nil {
 		panic(err)
 	}
@@ -33,10 +32,11 @@ func main() {
 		panic(err)
 	}
 	defer gw.Close()
+
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
-		discordMain(gw)
+		discordMain(gw, restClient)
 		wg.Done()
 	}()
 	go func() {
@@ -47,7 +47,7 @@ func main() {
 	wg.Wait()
 }
 
-func discordMain(gw *gateway) {
+func discordMain(gw *gateway, restClient *restClient) {
 	var initialStartup sync.Once
 	var myID snowflake
 
@@ -115,7 +115,7 @@ func discordMain(gw *gateway) {
 				striped = strings.TrimSpace(striped)
 				switch strings.ToLower(striped) {
 				case "ping":
-					msg, err := createMessage(d.ChannelID, "pong")
+					msg, err := restClient.createMessage(d.ChannelID, "pong")
 					if err != nil {
 						fmt.Printf("Failed to create message: %+v", err)
 						break
@@ -160,80 +160,4 @@ func mcMain(ctx context.Context, gw *gateway) {
 			fmt.Printf("Unsupported mc log of type %T: %+v", l, l)
 		}
 	}
-}
-
-func doReq(req *http.Request) (*http.Response, error) {
-	client := &http.Client{}
-
-	req.Header.Add("Authorization", "Bot "+os.Getenv("DISCRAFT_TOKEN"))
-
-	return client.Do(req)
-}
-
-// https://ptb.discord.com/developers/docs/topics/gateway#get-gateway-bot
-type gatewayResp struct {
-	URL string `json:"url"`
-}
-
-func getGatewayURL() (string, error) {
-	req, err := http.NewRequest("GET", discordBaseURL+"/gateway/bot", nil)
-	if err != nil {
-		return "", fmt.Errorf("creating request: %w", err)
-	}
-
-	res, err := doReq(req)
-	if err != nil {
-		return "", fmt.Errorf("executing request: %w", err)
-	}
-	defer res.Body.Close()
-
-	// TODO check res.Status
-
-	dec := json.NewDecoder(res.Body)
-	gResp := &gatewayResp{}
-	if err := dec.Decode(gResp); err != nil {
-		return "", fmt.Errorf("decoding response: %w", err)
-	}
-
-	return gResp.URL, nil
-}
-
-// https://discord.com/developers/docs/resources/channel#create-message
-func createMessage(channel snowflake, content string) (*messageObj, error) {
-	createMSGURL := fmt.Sprintf("%s/channels/%s/messages", discordBaseURL, channel)
-
-	data, err := json.Marshal(map[string]interface{}{
-		"content": content,
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("marshaling JSON: %w", err)
-	}
-
-	req, err := http.NewRequest("POST", createMSGURL, io.NopCloser(bytes.NewReader(data)))
-	if err != nil {
-		return nil, fmt.Errorf("creating request: %w", err)
-	}
-	req.Header.Add("content-type", "application/json")
-
-	req.GetBody = func() (io.ReadCloser, error) {
-		return io.NopCloser(bytes.NewReader(data)), nil
-	}
-
-	res, err := doReq(req)
-	if err != nil {
-		return nil, fmt.Errorf("doing request: %w", err)
-	}
-	defer res.Body.Close()
-
-	fmt.Printf("res = %+v\n", res)
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("reading entire response body: %w", err)
-	}
-	msg := &messageObj{}
-	if err := json.Unmarshal(body, msg); err != nil {
-		return nil, fmt.Errorf("parsing JSON: %w", err)
-	}
-	return msg, nil
 }
