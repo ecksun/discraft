@@ -10,8 +10,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/gorilla/websocket"
 )
 
 const discordBaseURL = "https://discord.com/api"
@@ -29,29 +27,17 @@ func main() {
 
 	fmt.Printf("Connecting to Gateway URL = %+v\n", gatewayURL)
 
-	wsc, _, err := websocket.DefaultDialer.Dial(gatewayURL, nil) // TODO: Specify API version
+	gw, err := newGateway(gatewayURL)
 	if err != nil {
 		panic(err)
 	}
-	defer wsc.Close()
-
-	writeJSONMessage := func(msg any) error {
-		data, err := json.Marshal(msg)
-		if err != nil {
-			return fmt.Errorf("marshaling message: %w", err)
-		}
-		fmt.Printf("Send: %s\n", data)
-		if err := wsc.WriteMessage(websocket.TextMessage, data); err != nil {
-			return fmt.Errorf("writing message: %w", err)
-		}
-		return nil
-	}
+	defer gw.Close()
 
 	var initialStartup sync.Once
 	var myID snowflake
 
 	for {
-		_, message, err := wsc.ReadMessage()
+		message, err := gw.ReadMessage()
 		if err != nil {
 			panic(err)
 		}
@@ -69,14 +55,14 @@ func main() {
 				go func() {
 					for {
 						time.Sleep(heartbeatInterval)
-						if err := writeJSONMessage(wsPayload{
+						if err := gw.writeJSONMessage(wsPayload{
 							OP: 1,
 						}); err != nil {
 							panic(err)
 						}
 					}
 				}()
-				if err := writeJSONMessage(wsPayload{
+				if err := gw.writeJSONMessage(wsPayload{
 					OP: 2,
 					D: opIdentify{
 						Token: os.Getenv("DISCRAFT_TOKEN"),

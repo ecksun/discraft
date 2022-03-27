@@ -4,7 +4,44 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
+
+type gateway struct {
+	wsc *websocket.Conn
+}
+
+func newGateway(gatewayURL string) (*gateway, error) {
+	wsc, _, err := websocket.DefaultDialer.Dial(gatewayURL, nil) // TODO: Specify API version
+	if err != nil {
+		return nil, fmt.Errorf("failed to dial websocket: %w", err)
+	}
+	return &gateway{
+		wsc: wsc,
+	}, nil
+}
+
+func (gw *gateway) Close() {
+	gw.wsc.Close()
+}
+
+func (gw *gateway) ReadMessage() ([]byte, error) {
+	_, message, err := gw.wsc.ReadMessage()
+	return message, err
+}
+
+func (gw *gateway) writeJSONMessage(msg any) error {
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("marshaling message: %w", err)
+	}
+	fmt.Printf("Send: %s\n", data)
+	if err := gw.wsc.WriteMessage(websocket.TextMessage, data); err != nil {
+		return fmt.Errorf("writing message: %w", err)
+	}
+	return nil
+}
 
 type wsPayload struct {
 	// https://ptb.discord.com/developers/docs/topics/opcodes-and-status-codes#gateway-gateway-opcodes
