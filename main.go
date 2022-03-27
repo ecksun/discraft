@@ -155,6 +155,8 @@ func (wsp *wsPayload) UnmarshalJSON(data []byte) error {
 			wsp.D = &opReady{}
 		case "MESSAGE_CREATE":
 			wsp.D = &dispatchMessageCreate{}
+		case "CHANNEL_CREATE":
+			wsp.D = &dispatchChannelCreate{}
 		default:
 			return fmt.Errorf("parsing unknown Dispatch type %q", wsp.T)
 		}
@@ -171,6 +173,14 @@ func (wsp *wsPayload) UnmarshalJSON(data []byte) error {
 		}
 	}
 	return nil
+}
+
+type dispatchChannelCreate channelObj
+
+// https://discord.com/developers/docs/resources/channel#channel-object
+type channelObj struct {
+	ID   snowflake `json:"id"`   // the id of this channel
+	Name string    `json:"name"` // the name of the channel (1-100 characters)
 }
 
 func main() {
@@ -273,6 +283,8 @@ func main() {
 					fmt.Println("This message was for me but I didn't know what to do")
 				}
 			}
+		case *dispatchChannelCreate:
+			fmt.Printf("Recieve Dispatch: CHANNEL_CREATE: %+v\n", d)
 		default:
 			fmt.Printf("Recieve: Unsupported payload: %+v\nD: %+v\n", payload, payload.D)
 		}
