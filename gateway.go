@@ -79,6 +79,8 @@ func (wsp *wsPayload) UnmarshalJSON(data []byte) error {
 		}
 	case 1: // Hearbeat
 		wsp.D = &opHeartbeat{}
+	case 7:
+		wsp.D = &opReconnect{}
 	case 10: // Hello
 		wsp.D = &opHello{}
 	case 11: // Heartbeat ACK
@@ -108,6 +110,8 @@ func (p *opHello) UnmarshalJSON(data []byte) error {
 type opHeartbeatACK struct{}
 
 type opHeartbeat struct{}
+
+type opReconnect struct{}
 
 type opIdentify struct {
 	Token           string             `json:"token"`           //	authentication token	-

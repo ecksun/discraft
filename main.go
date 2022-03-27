@@ -94,6 +94,10 @@ func discordMain(gw *gateway, restClient *restClient) {
 			})
 		case *opHeartbeatACK:
 			fmt.Println("Recieve: Heartbeat ACK")
+		case *opReconnect:
+			fmt.Println("Recieve: Reconnect")
+			fmt.Println("Shutting down..")
+			os.Exit(0)
 		case *dispatchReady:
 			myID = d.Application.ID
 			fmt.Printf("Recieve: Ready: %+v\n", d)
