@@ -270,7 +270,11 @@ func main() {
 				}
 			}
 			if mentionsMe {
-				striped := strings.TrimSpace(strings.ReplaceAll(d.Content, fmt.Sprintf("<@!%s>", myID), ""))
+				striped := d.Content
+				striped = strings.ReplaceAll(striped, fmt.Sprintf("<@!%s>", myID), "")
+				striped = strings.ReplaceAll(striped, fmt.Sprintf("<@&%s>", myID), "")
+				striped = strings.ReplaceAll(striped, fmt.Sprintf("<@%s>", myID), "")
+				striped = strings.TrimSpace(striped)
 				switch strings.ToLower(striped) {
 				case "ping":
 					msg, err := createMessage(d.ChannelID, "pong")
@@ -281,6 +285,7 @@ func main() {
 					fmt.Printf("msg = %+v\n", msg)
 				default:
 					fmt.Println("This message was for me but I didn't know what to do")
+					fmt.Printf("The stripped content was '%s'\n", striped)
 				}
 			}
 		case *dispatchChannelCreate:
