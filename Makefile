@@ -24,6 +24,7 @@ $(DEB_PACKAGE_DIR).deb: $(DEB_PACKAGE_DIR)/
 $(DEB_PACKAGE_DIR)/: \
 	$(DEB_PACKAGE_DIR)/DEBIAN/ \
 	$(DEB_PACKAGE_DIR)/usr/bin/$(NAME) \
+	$(DEB_PACKAGE_DIR)/lib/systemd/system/$(NAME).service \
 
 	touch "$@"
 
@@ -46,4 +47,8 @@ $(DEB_PACKAGE_DIR)/DEBIAN/%: debian/%
 $(DEB_PACKAGE_DIR)/usr/bin/$(NAME): $(OUT_DIR)/discraft
 %/usr/bin/$(NAME):
 	mkdir -p "$(dir $@)"
-	cp --link "$<" "$@"
+	cp --link --force "$<" "$@"
+
+$(DEB_PACKAGE_DIR)/lib/systemd/system/$(NAME).service: $(NAME).service
+	mkdir -p "$(dir $@)"
+	cp --link --force "$<" "$@"

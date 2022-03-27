@@ -6,6 +6,7 @@ After=network.target
 EnvironmentFile=/etc/default/discraft
 ExecStart=/usr/bin/discraft
 Restart=always
+RestartPreventExitStatus=10
 
 [Install]
 WantedBy=multi-user.target

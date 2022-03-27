@@ -18,6 +18,18 @@ const (
 )
 
 func main() {
+	reqEnvs := []string{
+		"DISCRAFT_TOKEN",
+		"DISCRAFT_CHANNEL",
+	}
+	for _, env := range reqEnvs {
+		if os.Getenv(env) == "" {
+			fmt.Printf("Please set these environment variables: %s\n", strings.Join(reqEnvs, ", "))
+			fmt.Printf("%s is not set\n", env)
+			os.Exit(10) // exit-status 10 means the service will not restart
+		}
+	}
+
 	restClient := newRESTClient()
 
 	gatewayURL, err := restClient.getGatewayURL()
