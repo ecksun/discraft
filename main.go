@@ -86,7 +86,7 @@ type messageObj struct {
 	ID        snowflake  `json:"id"`         // id of the message
 	ChannelID snowflake  `json:"channel_id"` // id of the channel the message was sent in
 	GuildID   *snowflake `json:"guild_id"`   // id of the guild the message was sent in
-	// Author	user object	`json:"author*"`	// the author of this message (not guaranteed to be a valid user, see below)
+	Author    *userObj   `json:"author"`     // the author of this message (not guaranteed to be a valid user, see below)
 	// Member	partial guild member object	`json:"member?**"`	// member properties for this message's author
 	Content string `json:"content"` // contents of the message
 	// Timestamp	ISO8601 timestamp	`json:"timestamp"`	// when this message was sent
@@ -261,7 +261,7 @@ func main() {
 			fmt.Printf("Recieve: Ready: %+v\n", d)
 			fmt.Printf("myID = %+v\n", myID)
 		case *dispatchMessageCreate:
-			fmt.Printf("Recieve Dispatch: MESSAGE_CREATE = %+v\n", d)
+			fmt.Printf("Recieve Dispatch: MESSAGE_CREATE = <%s> %s\n", d.Author.Username, d.Content)
 			mentionsMe := false
 			for _, mention := range d.Mentions {
 				if mention.ID == myID {
