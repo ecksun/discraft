@@ -129,8 +129,8 @@ type opIdentify struct {
 
 type identifyProperties struct {
 	OS      string `json:"$os"`
-	Browser string `json:$browser"`
-	Device  string `json:$device"`
+	Browser string `json:"$browser"`
+	Device  string `json:"$device"`
 }
 
 type dispatchReady struct {
