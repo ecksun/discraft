@@ -133,6 +133,22 @@ type identifyProperties struct {
 	Device  string `json:"$device"`
 }
 
+// https://discord.com/developers/docs/topics/gateway#update-presence
+type opUpdatePresence struct {
+	Since      int              `json:"since"`
+	Activities []activityObject `json:"activities"`
+	// https://discord.com/developers/docs/topics/gateway#update-presence-status-types
+	Status string `json:"status"` // can be one of online, dnd, idle, invisible, offline
+	AFK    bool   `json:"afk"`
+}
+
+// https://discord.com/developers/docs/topics/gateway#activity-object
+type activityObject struct {
+	Name string `json:"name"`
+	Type int    `json:"type"`
+	URL  string `json:"url,omitempty"`
+}
+
 type dispatchReady struct {
 	V int `json:"v"` //	gateway version
 	// User	user `json:"user"` //	object	information about the user including email

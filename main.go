@@ -46,21 +46,23 @@ func main() {
 	}
 	defer gw.Close()
 
+	mcServer := newMCServer(gw, restClient)
+
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
-		discordMain(gw, restClient)
+		discordMain(gw, restClient, mcServer)
 		wg.Done()
 	}()
 	go func() {
-		mcMain(context.Background(), gw, restClient)
+		mcServer.run(context.Background())
 		wg.Done()
 	}()
 
 	wg.Wait()
 }
 
-func discordMain(gw *gateway, restClient *restClient) {
+func discordMain(gw *gateway, restClient *restClient, mcServer *mcServer) {
 	var initialStartup sync.Once
 	var myID snowflake
 
@@ -138,6 +140,22 @@ func discordMain(gw *gateway, restClient *restClient) {
 						break
 					}
 					fmt.Printf("msg = %+v\n", msg)
+				case "playing?":
+					players := mcServer.getPlayers()
+					var reply string
+					if len(players) == 0 {
+						reply = "No one is playing :("
+					} else if len(players) == 1 {
+						reply = fmt.Sprintf("Currently %s is playing alone", players[0])
+					} else {
+						reply = fmt.Sprintf("Currently %s and %s are playing", strings.Join(players[1:], ", "), players[0])
+					}
+					msg, err := restClient.createMessage(d.ChannelID, reply)
+					if err != nil {
+						fmt.Printf("Failed to respond to playing: %+v", err)
+						return
+					}
+					fmt.Printf("msg = %+v\n", msg)
 				default:
 					fmt.Println("This message was for me but I didn't know what to do")
 					fmt.Printf("The stripped content was '%s'\n", striped)
@@ -151,12 +169,72 @@ func discordMain(gw *gateway, restClient *restClient) {
 	}
 }
 
-func mcMain(ctx context.Context, gw *gateway, restClient *restClient) {
+type mcServer struct {
+	sync.Mutex
+	players map[string]struct{}
+
+	restClient *restClient
+	gw         *gateway
+	channelID  snowflake
+}
+
+func (serv *mcServer) playerJoined(player string) {
+	serv.Lock()
+	defer serv.Unlock()
+	serv.players[player] = struct{}{}
+}
+
+func (serv *mcServer) playerParted(player string) {
+	serv.Lock()
+	defer serv.Unlock()
+	delete(serv.players, player)
+}
+
+func (serv *mcServer) getPlayers() []string {
+	serv.Lock()
+	defer serv.Unlock()
+	players := []string{}
+	for player := range serv.players {
+		players = append(players, player)
+	}
+	return players
+}
+
+func newMCServer(gw *gateway, restClient *restClient) *mcServer {
 	mcChannelID := snowflake(os.Getenv("DISCRAFT_CHANNEL"))
 	if len(mcChannelID) == 0 {
 		panic("DISCRAFT_CHANNEL not set")
 	}
 
+	return &mcServer{
+		players:    map[string]struct{}{},
+		channelID:  mcChannelID,
+		restClient: restClient,
+		gw:         gw,
+	}
+}
+
+func (serv *mcServer) updateStatus() {
+	players := serv.getPlayers()
+	status := "is none" // will be displayed as "Playing is none"
+	if len(players) > 0 {
+		status = fmt.Sprintf("atm is: %s", strings.Join(players, ","))
+	}
+	if err := serv.gw.writeJSONMessage(wsPayload{
+		OP: 3,
+		D: opUpdatePresence{
+			Since:  int(time.Now().Unix()),
+			Status: "idle",
+			Activities: []activityObject{
+				{Type: 0, Name: status},
+			},
+		},
+	}); err != nil {
+		panic(err)
+	}
+}
+
+func (serv *mcServer) run(ctx context.Context) {
 	lines, err := parseMCLog(ctx, os.Getenv("DISCRAFT_MCLOGFILE"))
 	if err != nil {
 		panic(err)
@@ -165,15 +243,13 @@ func mcMain(ctx context.Context, gw *gateway, restClient *restClient) {
 	for log := range lines {
 		switch l := log.(type) {
 		case logJoin:
-			if _, err := restClient.createMessage(mcChannelID, fmt.Sprintf("%s joined", l.user)); err != nil {
-				fmt.Printf("failed to create message for %#v: %+v", l, err)
-			}
+			serv.playerJoined(l.user)
+			serv.updateStatus()
 		case logPart:
-			if _, err := restClient.createMessage(mcChannelID, fmt.Sprintf("%s left", l.user)); err != nil {
-				fmt.Printf("failed to create message for %#v: %+v", l, err)
-			}
+			serv.playerParted(l.user)
+			serv.updateStatus()
 		case logMsg:
-			if _, err := restClient.createMessage(mcChannelID, fmt.Sprintf("<%s> %s", l.user, l.msg)); err != nil {
+			if _, err := serv.restClient.createMessage(serv.channelID, fmt.Sprintf("<%s> %s", l.user, l.msg)); err != nil {
 				fmt.Printf("failed to create message for %#v: %+v", l, err)
 			}
 		default:
