@@ -13,7 +13,7 @@ type gateway struct {
 }
 
 func newGateway(gatewayURL string) (*gateway, error) {
-	wsc, _, err := websocket.DefaultDialer.Dial(gatewayURL, nil) // TODO: Specify API version
+	wsc, _, err := websocket.DefaultDialer.Dial(gatewayURL+"?v=9", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial websocket: %w", err)
 	}
