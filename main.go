@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -22,6 +23,8 @@ func main() {
 		"DISCRAFT_TOKEN",
 		"DISCRAFT_CHANNEL",
 		"DISCRAFT_MCLOGFILE",
+		"DISCRAFT_MCHOST",
+		"DISCRAFT_MCPORT",
 	}
 	for _, env := range reqEnvs {
 		if os.Getenv(env) == "" {
@@ -190,6 +193,15 @@ func (serv *mcServer) playerParted(player string) {
 	delete(serv.players, player)
 }
 
+func (serv *mcServer) setPlayers(players []string) {
+	serv.Lock()
+	defer serv.Unlock()
+	serv.players = map[string]struct{}{}
+	for _, player := range players {
+		serv.players[player] = struct{}{}
+	}
+}
+
 func (serv *mcServer) getPlayers() []string {
 	serv.Lock()
 	defer serv.Unlock()
@@ -235,7 +247,12 @@ func (serv *mcServer) updateStatus() {
 }
 
 func (serv *mcServer) run(ctx context.Context) {
-	lines, err := parseMCLog(ctx, os.Getenv("DISCRAFT_MCLOGFILE"))
+	mcPort, err := strconv.ParseUint(os.Getenv("DISCRAFT_MCPORT"), 10, 16)
+	if err != nil {
+		panic(err)
+	}
+
+	lines, err := monitorMCServer(ctx, os.Getenv("DISCRAFT_MCLOGFILE"), os.Getenv("DISCRAFT_MCHOST"), uint16(mcPort))
 	if err != nil {
 		panic(err)
 	}
@@ -252,6 +269,9 @@ func (serv *mcServer) run(ctx context.Context) {
 			if _, err := serv.restClient.createMessage(serv.channelID, fmt.Sprintf("<%s> %s", l.user, l.msg)); err != nil {
 				fmt.Printf("failed to create message for %#v: %+v", l, err)
 			}
+		case mcPing:
+			serv.setPlayers(l.players)
+			serv.updateStatus()
 		default:
 			fmt.Printf("Unsupported mc log of type %T: %+v", l, l)
 		}

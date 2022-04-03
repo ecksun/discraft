@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"sort"
+	"time"
 
+	"github.com/alteamc/minequery/ping"
 	"github.com/nxadm/tail"
 )
 
@@ -22,9 +25,21 @@ type logMsg struct {
 	msg  string
 }
 
-func parseMCLog(ctx context.Context, file string) (chan any, error) {
-	out := make(chan any)
+type mcPing struct {
+	players []string
+}
 
+func monitorMCServer(ctx context.Context, file string, mcHost string, mcPort uint16) (chan any, error) {
+	out := make(chan any)
+	if err := parseMCLog(ctx, out, file); err != nil {
+		return out, fmt.Errorf("failed to start log file parsing: %w", err)
+	}
+	pingMCServer(ctx, out, mcHost, mcPort)
+
+	return out, nil
+}
+
+func parseMCLog(ctx context.Context, out chan any, file string) error {
 	timeRegex := `[0-2][0-9]:[0-6][0-9]:[0-6][0-9]`
 	joinRegex := regexp.MustCompile(fmt.Sprintf(`\[%s\] \[Server thread\/INFO\]: (.*) joined the game`, timeRegex))
 	partRegex := regexp.MustCompile(fmt.Sprintf(`\[%s\] \[Server thread\/INFO\]: (.*) left the game`, timeRegex))
@@ -38,7 +53,7 @@ func parseMCLog(ctx context.Context, file string) (chan any, error) {
 		},
 	})
 	if err != nil {
-		return out, fmt.Errorf("tailing log file: %+v", err)
+		return fmt.Errorf("tailing log file: %+v", err)
 	}
 
 	go func() {
@@ -48,7 +63,6 @@ func parseMCLog(ctx context.Context, file string) (chan any, error) {
 
 	go func() {
 		defer t.Cleanup()
-		// Print the text of each received line
 		for line := range t.Lines {
 			if line.Text == "EOF for testing" {
 				break
@@ -73,5 +87,36 @@ func parseMCLog(ctx context.Context, file string) (chan any, error) {
 		close(out)
 	}()
 
-	return out, nil
+	return nil
+}
+
+func pingMCServer(ctx context.Context, out chan any, host string, port uint16) {
+	pingServer := func() {
+		res, err := ping.Ping(host, port)
+		if err != nil {
+			panic(err)
+		}
+		players := []string{}
+		for _, player := range res.Players.Sample {
+			players = append(players, player.Name)
+		}
+
+		sort.Strings(players)
+
+		out <- mcPing{
+			players: players,
+		}
+	}
+
+	go func() {
+		pingServer()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(1 * time.Minute):
+				pingServer()
+			}
+		}
+	}()
 }

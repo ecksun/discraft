@@ -25,8 +25,8 @@ func TestFoo(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	lines, err := parseMCLog(ctx, filePath)
-	if err != nil {
+	lines := make(chan any)
+	if err := parseMCLog(ctx, lines, filePath); err != nil {
 		t.Fatalf("failed to create fooer: %+v", err)
 	}
 
