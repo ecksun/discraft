@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -209,6 +211,7 @@ func (serv *mcServer) getPlayers() []string {
 	for player := range serv.players {
 		players = append(players, player)
 	}
+	sort.Strings(players)
 	return players
 }
 
@@ -270,8 +273,11 @@ func (serv *mcServer) run(ctx context.Context) {
 				fmt.Printf("failed to create message for %#v: %+v", l, err)
 			}
 		case mcPing:
+			prevPlayers := serv.getPlayers()
 			serv.setPlayers(l.players)
-			serv.updateStatus()
+			if !reflect.DeepEqual(serv.getPlayers(), prevPlayers) {
+				serv.updateStatus()
+			}
 		default:
 			fmt.Printf("Unsupported mc log of type %T: %+v", l, l)
 		}
