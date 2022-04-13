@@ -16,6 +16,16 @@ set -e
 
 case "$1" in
     configure)
+        if ! getent passwd discraft >/dev/null; then
+            adduser \
+                --disabled-password \
+                --quiet \
+                --system \
+                --no-create-home \
+                --group discraft
+        fi
+
+
         systemctl daemon-reload
         systemctl enable discraft.service
         systemctl restart discraft.service

@@ -3,6 +3,9 @@ Description=A discord <-> minecraft bridge
 After=network.target
 
 [Service]
+User=discraft
+Group=discraft
+
 EnvironmentFile=/etc/default/discraft
 ExecStart=/usr/bin/discraft
 Restart=always
