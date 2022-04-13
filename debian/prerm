@@ -16,6 +16,8 @@ set -e
 
 case "$1" in
     remove)
+        systemctl disable discraft.service
+        systemctl stop discraft.service
     ;;
     upgrade|deconfigure)
     ;;
