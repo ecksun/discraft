@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -176,7 +175,8 @@ func discordMain(gw *gateway, restClient *restClient, mcServer *mcServer) {
 
 type mcServer struct {
 	sync.Mutex
-	players map[string]struct{}
+	players      map[string]struct{}
+	latestStatus string
 
 	restClient *restClient
 	gw         *gateway
@@ -235,6 +235,12 @@ func (serv *mcServer) updateStatus() {
 	if len(players) > 0 {
 		status = fmt.Sprintf("atm is: %s", strings.Join(players, ","))
 	}
+
+	if status == serv.latestStatus {
+		return
+	}
+	serv.latestStatus = status
+
 	if err := serv.gw.writeJSONMessage(wsPayload{
 		OP: 3,
 		D: opUpdatePresence{
@@ -273,11 +279,8 @@ func (serv *mcServer) run(ctx context.Context) {
 				fmt.Printf("failed to create message for %#v: %+v", l, err)
 			}
 		case mcPing:
-			prevPlayers := serv.getPlayers()
 			serv.setPlayers(l.players)
-			if !reflect.DeepEqual(serv.getPlayers(), prevPlayers) {
-				serv.updateStatus()
-			}
+			serv.updateStatus()
 		default:
 			fmt.Printf("Unsupported mc log of type %T: %+v", l, l)
 		}
