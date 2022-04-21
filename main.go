@@ -233,7 +233,7 @@ func (serv *mcServer) updateStatus() {
 	players := serv.getPlayers()
 	status := "is none" // will be displayed as "Playing is none"
 	if len(players) > 0 {
-		status = fmt.Sprintf("atm is: %s", strings.Join(players, ","))
+		status = fmt.Sprintf("is %d players", len(players))
 	}
 
 	if status == serv.latestStatus {
