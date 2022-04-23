@@ -29,6 +29,8 @@ type mcPing struct {
 	players []string
 }
 
+type mcError struct{}
+
 func monitorMCServer(ctx context.Context, file string, mcHost string, mcPort uint16) (chan any, error) {
 	out := make(chan any)
 	if err := parseMCLog(ctx, out, file); err != nil {
@@ -94,6 +96,7 @@ func pingMCServer(ctx context.Context, out chan any, host string, port uint16) {
 	pingServer := func() {
 		res, err := ping.Ping(host, port)
 		if err != nil {
+			out <- mcError{}
 			fmt.Printf("Failed to ping minecraft server: %+v", err)
 			return
 		}

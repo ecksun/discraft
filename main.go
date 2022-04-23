@@ -236,6 +236,10 @@ func (serv *mcServer) updateStatus() {
 		status = fmt.Sprintf("is %d players", len(players))
 	}
 
+	serv.setStatus(status)
+}
+
+func (serv *mcServer) setStatus(status string) {
 	if status == serv.latestStatus {
 		return
 	}
@@ -281,6 +285,8 @@ func (serv *mcServer) run(ctx context.Context) {
 		case mcPing:
 			serv.setPlayers(l.players)
 			serv.updateStatus()
+		case mcError:
+			serv.setStatus("is none because ping failed")
 		default:
 			fmt.Printf("Unsupported mc log of type %T: %+v", l, l)
 		}
