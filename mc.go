@@ -94,7 +94,8 @@ func pingMCServer(ctx context.Context, out chan any, host string, port uint16) {
 	pingServer := func() {
 		res, err := ping.Ping(host, port)
 		if err != nil {
-			panic(err)
+			fmt.Printf("Failed to ping minecraft server: %+v", err)
+			return
 		}
 		players := []string{}
 		for _, player := range res.Players.Sample {
