@@ -25,6 +25,8 @@ type logMsg struct {
 	msg  string
 }
 
+type logCorruption struct{}
+
 type mcPing struct {
 	players []string
 }
@@ -46,6 +48,7 @@ func parseMCLog(ctx context.Context, out chan any, file string) error {
 	joinRegex := regexp.MustCompile(fmt.Sprintf(`\[%s\] \[Server thread\/INFO\]: (.*) joined the game`, timeRegex))
 	partRegex := regexp.MustCompile(fmt.Sprintf(`\[%s\] \[Server thread\/INFO\]: (.*) left the game`, timeRegex))
 	msgRegex := regexp.MustCompile(fmt.Sprintf(`\[%s\] \[Server thread\/INFO\]: <([^>]+)> (.*)`, timeRegex))
+	corruptionRegex := regexp.MustCompile(fmt.Sprintf(`\[%s\] \[Server thread\/WARN\] \[FML\/]: .*Forge Mod Loader detected that the backup level.dat is being used.`, timeRegex))
 
 	t, err := tail.TailFile(file, tail.Config{
 		Follow: true,
@@ -84,6 +87,9 @@ func parseMCLog(ctx context.Context, out chan any, file string) error {
 					user: match[1],
 					msg:  match[2],
 				}
+			}
+			if match := corruptionRegex.FindStringSubmatch(line.Text); len(match) > 0 {
+				out <- logCorruption{}
 			}
 		}
 		close(out)

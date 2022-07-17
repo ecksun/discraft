@@ -282,6 +282,10 @@ func (serv *mcServer) run(ctx context.Context) {
 			if _, err := serv.restClient.createMessage(serv.channelID, fmt.Sprintf("<%s> %s", l.user, l.msg)); err != nil {
 				fmt.Printf("failed to create message for %#v: %+v", l, err)
 			}
+		case logCorruption:
+			if _, err := serv.restClient.createMessage(serv.channelID, "Corruption detected in log. Someone probably needs to restore a backup!"); err != nil {
+				fmt.Printf("failed to create message for %#v: %+v", l, err)
+			}
 		case mcPing:
 			serv.setPlayers(l.players)
 			serv.updateStatus()
